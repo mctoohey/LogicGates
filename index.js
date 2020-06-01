@@ -1,11 +1,53 @@
 ;(function () {
     let canvas, ctx;
 
-    class Switch {
+    class LogicObject {
         constructor (x = 0, y = 0) {
             this.x = Number(x);
             this.y = Number(y);
             this.size = 50;
+            this.outputNode = null;
+            this.inputNodes = [];
+        }
+
+        draw(ctx) {}
+
+        updateState(updatedNodes) {}
+
+        clickCallback() {}
+
+        getAllNodes() {
+            // Ineffiecent to do this everytime. Consider generater or precomputing.
+            let nodes = [];
+            for (let node of this.inputNodes) {
+                nodes.push(node);
+            }
+            nodes.push(this.outputNode);
+            return nodes;
+        }
+
+        moveBy(dx, dy) {
+            this.x += dx;
+            this.y += dy;
+
+            for (let node of this.inputNodes) {
+                node.x += dx;
+                node.y += dy;
+            }
+            this.outputNode.x += dx;
+            this.outputNode.y += dy;
+        }
+
+        inHitBox(x, y) {
+            return (this.x <= x && x <= this.x+this.size && this.y <= y && y <= this.y+this.size);
+        }
+
+
+    }
+
+    class Switch extends LogicObject {
+        constructor (x = 0, y = 0) {
+            super(x, y);
             this.outputNode = new Node(this.x+70, this.y+25, true);
             this.state = false;
         }
@@ -31,36 +73,15 @@
             ctx.stroke();
         }
 
-        getAllNodes() {
-            let nodes = [];
-            nodes.push(this.outputNode);
-            return nodes;
-        }
-        moveBy(dx, dy) {
-            this.x += dx;
-            this.y += dy;
-
-            this.outputNode.x += dx;
-            this.outputNode.y += dy;
-        }
-
-        inHitBox(x, y) {
-            return (this.x <= x && x <= this.x+50 && this.y <= y && y <= this.y+50);
-        }
-
         clickCallback() {
-            console.log("test");
             this.outputNode.hardState = !this.outputNode.hardState;
             this.state = !this.state;
-            // console.log(this.outputNode.state);
         }
     }
 
-    class LogicGate {
+    class NANDGate extends LogicObject {
         constructor (x = 0, y = 0) {
-            this.x = Number(x);
-            this.y = Number(y);
-            this.size = 50;
+            super(x, y);
             this.inputNodes = [new Node(this.x-20, this.y+12, true), 
                                new Node(this.x-20, this.y+38, true)];
             
@@ -113,35 +134,17 @@
         }
 
         updateState(updated) {
-            this.outputNode.hardState = true;
+            this.outputNode.hardState = false;
+            // for (let node of this.inputNodes) {
+            //     if (!updated.has(node)) {
+            //         node.updateState(updated);
+            //     }
+            // }
             for (let node of this.inputNodes) {
-                this.outputNode.hardState &= node.softState;
+                this.outputNode.hardState |= !node.softState;                
             }
-            this.outputNode.updateState(updated);
-        }
-
-        getAllNodes() {
-            let nodes = [];
-            for (let node of this.inputNodes) {
-                nodes.push(node);
-            }
-            nodes.push(this.outputNode);
-            return nodes;
-        }
-        moveBy(dx, dy) {
-            this.x += dx;
-            this.y += dy;
-
-            for (let node of this.inputNodes) {
-                node.x += dx;
-                node.y += dy;
-            }
-            this.outputNode.x += dx;
-            this.outputNode.y += dy;
-        }
-
-        inHitBox(x, y) {
-            return (this.x <= x && x <= this.x+50 && this.y <= y && y <= this.y+50);
+            this.outputNode.prev = this.outputNode.hardState;
+            // this.outputNode.updateState(updated);
         }
     }
 
@@ -194,16 +197,14 @@
             this.softState = this.hardState;
             updated.add(this);
             for (let node of this.neighbours) {
+                if (!updated.has(node)) {
+                    node.updateState(updated);
+                }
                 this.softState |= node.softState;
             }
-            for (let node of this.neighbours) {
-                if (this.softState && !node.softState) {
-                    node.updateState(updated);
-                }                
-            }
-            if (this.logicObject) {
-                this.logicObject.updateState(updated);
-            }
+            // if (this.logicObject) {
+            //     this.logicObject.updateState(updated);
+            // }
         }
 
         draw(ctx, updated) {
@@ -250,66 +251,6 @@
 
         getAllNodes() {
             return [];
-        }
-    }
-
-    class Wire {
-        constructor (startNode) {
-            this.nodes = [startNode];
-            this.constructing = false;
-            this.constructionPoint = {x: 0, y: 0};
-        }
-
-        setConstructionPoint(x, y) {
-            this.constructing = true;
-            this.constructionPoint = {x: x, y: y};
-        }
-
-        stopConstruction() {
-            this.constructing = false;
-        }
-        
-        addNode(node) {
-            // this.nodes[this.nodes.length-1].filled = true;
-            this.nodes.push(node);
-        }
-
-        popPoint() {
-            this.nodes.pop();
-            // if (this.nodes.length > 0) this.nodes[this.nodes.length-1].filled = false;
-        }
-
-        isEmpty() {
-            return (this.nodes.length === 0);
-        }
-
-        inHitBox(x, y) {
-            return false;
-        }
-
-        getAllNodes() {
-            return this.nodes;
-        }
-
-        draw(ctx, scale) {
-            ctx.save();
-            ctx.strokeStyle = 'black';
-            ctx.lineWidth = 2;
-            ctx.moveTo(this.nodes[0].x, this.nodes[0].y);
-            for (let i = 1; i < this.nodes.length; i++) {
-                ctx.lineTo(this.nodes[i].x, this.nodes[i].y);
-            }
-
-            if (this.constructing) {
-                ctx.lineTo(this.constructionPoint.x, this.constructionPoint.y);
-            }
-
-            ctx.stroke();
-
-            for (let node of this.nodes) {
-                node.draw(ctx);
-            }
-            ctx.restore();
         }
     }
 
@@ -480,10 +421,6 @@
             this.clearCanvas();
             
             this.camera.applyTransformations(ctx);
-            
-            for (let object of this.objects) {
-                object.draw(this.ctx, 1);
-            }
 
             for (let node of this.allNodes) {
                 node.softState = false;
@@ -493,11 +430,19 @@
                 node.updateState(updatedNodes);
             }
 
+            for (let object of this.objects) {
+                object.updateState();
+            }
+
             updatedNodes = new Set();
             for (let node of this.allNodes) {
                 if (!updatedNodes.has(node)) {
                     node.draw(ctx, updatedNodes)
                 }
+            }
+
+            for (let object of this.objects) {
+                object.draw(this.ctx, 1);
             }
 
             if (this.constructionNode) {
@@ -543,22 +488,16 @@
 
         let scene = new Scene(canvas, ctx);
 
-        let gate = new LogicGate(10, 10);
-        let gate2 = new LogicGate(100, 100);
-        gate.updateState = (updated) => {
-            gate.outputNode.hardState = false;
-            for (let node of gate.inputNodes) {
-                gate.outputNode.hardState |= node.softState;
-            }
-            gate.outputNode.updateState(updated);
-        }
+        let gate = new NANDGate(10, 10);
+        let gate2 = new NANDGate(100, 100);
         scene.addObject(gate);
         scene.addObject(gate2);
-        scene.addObject(new LogicGate(50, 50));
+        scene.addObject(new NANDGate(50, 50));
+        scene.addObject(new NANDGate(150, 150));
         scene.addObject(new Switch(200, 200));
         scene.addObject(new Switch(300, 300));
-        scene.addObject(new Switch(350, 450));
-        scene.addObject(new Switch(400, 400));
+        // scene.addObject(new Switch(350, 450));
+        // scene.addObject(new Switch(400, 400));
         scene.update();
 
         document.addEventListener("keydown", function(event) {
@@ -572,6 +511,8 @@
                 scene.draggingMode = false;
             }
         });
+
+        setInterval(scene.update.bind(scene), 16);
     }
 
     document.addEventListener('DOMContentLoaded', init);
