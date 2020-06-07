@@ -8,6 +8,8 @@
             this.size = 50;
             this.outputNode = null;
             this.inputNodes = [];
+
+            this.isSelected = false;
         }
 
         draw(ctx) {}
@@ -59,7 +61,12 @@
             } else {
                 ctx.fillStyle = 'white';
             }
-            ctx.strokeStyle = 'black';
+            if (this.isSelected) {
+                ctx.strokeStyle = 'blue';
+            } else {
+                ctx.strokeStyle = 'black';
+            }
+            
             ctx.lineWidth = 2;
         
             ctx.beginPath();
@@ -99,7 +106,11 @@
             ctx.lineWidth = 2;
     
             ctx.beginPath();
-            ctx.strokeStyle = 'black';
+            if (this.isSelected) {
+                ctx.strokeStyle = 'blue';
+            } else {
+                ctx.strokeStyle = 'black';
+            }
             ctx.moveTo(this.x*scale, this.y*scale);
             ctx.lineTo((this.x+25)*scale, this.y*scale);
     
@@ -266,6 +277,9 @@
             this.consturctionHistory = [];
             this.allNodes = new Set();
 
+            this.selectedObjects = [];
+            this.selectionRectangleStart = null;
+
             this.mousePos = {sceneX: 0, sceneY: 0, canvasX: 0, canvasY: 0};
             
             canvas.addEventListener('mousemove', e => {
@@ -277,7 +291,13 @@
                 }
                 if (this.draggedObjects.length > 0) {
                     for (let object of this.draggedObjects) {
-                        object.moveBy(e.offsetX-this.mousePos.canvasX, e.offsetY-this.mousePos.canvasY);
+                        if (object.isSelected) {
+                            for (let selectedObject of this.selectedObjects) {
+                                selectedObject.moveBy(e.offsetX-this.mousePos.canvasX, e.offsetY-this.mousePos.canvasY);
+                            }
+                        } else {
+                            object.moveBy(e.offsetX-this.mousePos.canvasX, e.offsetY-this.mousePos.canvasY);
+                        }
                     }
                 }
                 this.update();
@@ -294,10 +314,15 @@
                     this.draggingScene = true;
                 } else {
                     if (e.button === 0) {
+                        let clickedObject = false;
                         for (let object of this.objects) {
                             if (object.inHitBox(this.mousePos.sceneX, this.mousePos.sceneY)) {
                                 this.draggedObjects.push(object);
+                                clickedObject = true;
                             }
+                        }
+                        if (!clickedObject && this.selectionRectangleStart == null) {
+                            this.selectionRectangleStart = {x: this.mousePos.sceneX, y: this.mousePos.sceneY};
                         }
                     } else if (e.button === 2) {
                         if (this.constructionNode) {
@@ -375,6 +400,7 @@
             canvas.addEventListener('mouseup', e => {
                 this.draggingScene = false;
                 this.draggedObjects = [];
+                this.selectionRectangleStart = null;
 
                 for (let object of this.objects) {
                     if (object.inHitBox(this.mousePos.sceneX, this.mousePos.sceneY)) {
@@ -452,6 +478,25 @@
                 ctx.lineTo(this.mousePos.sceneX, this.mousePos.sceneY);
                 ctx.stroke();
             }
+
+            if (this.selectionRectangleStart) {
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = 'black';
+                ctx.rect(this.selectionRectangleStart.x, this.selectionRectangleStart.y,
+                         this.mousePos.sceneX-this.selectionRectangleStart.x, 
+                         this.mousePos.sceneY-this.selectionRectangleStart.y);
+                ctx.stroke();
+                this.selectedObjects = []
+                for (let object of this.objects) {
+                    object.isSelected = false;
+                    if (Math.min(this.selectionRectangleStart.x, this.mousePos.sceneX) <= object.x && object.x <= Math.max(this.selectionRectangleStart.x, this.mousePos.sceneX) &&
+                        Math.min(this.selectionRectangleStart.y, this.mousePos.sceneY) <= object.y && object.y <= Math.max(this.selectionRectangleStart.y, this.mousePos.sceneY)) {
+                            object.isSelected = true;
+                            this.selectedObjects.push(object);
+                    }
+                }
+
+            }
         }
     }
 
@@ -488,14 +533,11 @@
 
         let scene = new Scene(canvas, ctx);
 
-        let gate = new NANDGate(10, 10);
-        let gate2 = new NANDGate(100, 100);
-        scene.addObject(gate);
-        scene.addObject(gate2);
-        scene.addObject(new NANDGate(50, 50));
-        scene.addObject(new NANDGate(150, 150));
-        scene.addObject(new Switch(200, 200));
-        scene.addObject(new Switch(300, 300));
+        for (let i=0; i<10; i++) {
+            scene.addObject(new NANDGate(i*50, i*50));
+        }
+        scene.addObject(new Switch(50, 200));
+        scene.addObject(new Switch(50, 300));
         // scene.addObject(new Switch(350, 450));
         // scene.addObject(new Switch(400, 400));
         scene.update();
